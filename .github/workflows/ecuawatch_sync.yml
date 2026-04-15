@@ -1,0 +1,241 @@
+name: EcuaWatch — Sincronización Integral del Gobierno Ecuador
+
+on:
+  # Ejecución automática por horarios inteligentes
+  schedule:
+    # DIARIO 02:00 UTC — Asamblea + Registro Oficial + Datos Abiertos + Linker
+    - cron: "0 2 * * *"
+    # MENSUAL primer día 04:00 UTC — BCE + INEC (datos macro/demográficos)
+    - cron: "0 4 1 * *"
+    # SEMANAL lunes 06:00 UTC — CNE (resultados electorales)
+    - cron: "0 6 * * 1"
+
+  # Ejecución manual con opciones
+  workflow_dispatch:
+    inputs:
+      fuente:
+        description: "Fuente a ejecutar (all / datos_abiertos / inec / bce / cne / asamblea / registro / linker)"
+        required: false
+        default: "all"
+      modo_test:
+        description: "Modo prueba (true/false)"
+        required: false
+        default: "false"
+      excluir:
+        description: "Fuentes a excluir separadas por espacio (ej: bce cne)"
+        required: false
+        default: ""
+
+  # Push al main (útil para CI)
+  push:
+    branches:
+      - main
+    paths:
+      - "EcuaWatch/collectors/*.py"
+      - "EcuaWatch/orquestador.py"
+      - ".github/workflows/ecuawatch_sync.yml"
+
+env:
+  PYTHON_VERSION: "3.11"
+  REPO_PATH: "EcuaWatch"
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 1: DATOS DIARIOS — Asamblea + Registro Oficial + Datos Abiertos
+  # ──────────────────────────────────────────────────────────────────────────
+  sync-diario:
+    name: "📋 Sync Diario (Legislativo + CKAN)"
+    runs-on: ubuntu-latest
+    # Solo en cron diario o ejecución manual/push con fuentes diarias
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 2 * * *')
+
+    steps:
+      - name: "📥 Checkout del repositorio"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Configurar Python ${{ env.PYTHON_VERSION }}"
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: "📦 Instalar dependencias"
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          # Intentar instalar dependencias opcionales
+          pip install openpyxl pdfplumber || true
+
+      - name: "🏛️ Ejecutar Scraper — Asamblea Nacional"
+        env:
+          MONGO_URI:          ${{ secrets.MONGO_URI }}
+          GOOGLE_CREDS_JSON:  ${{ secrets.GOOGLE_CREDS_JSON }}
+          DRIVE_FOLDER_ID:    ${{ secrets.DRIVE_FOLDER_ID }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          python scraper_asamblea.py || echo "⚠️ Asamblea scraper terminó con errores"
+        continue-on-error: true
+
+      - name: "📰 Ejecutar Scraper — Registro Oficial"
+        env:
+          MONGO_URI:          ${{ secrets.MONGO_URI }}
+          GOOGLE_CREDS_JSON:  ${{ secrets.GOOGLE_CREDS_JSON }}
+          DRIVE_FOLDER_ID:    ${{ secrets.DRIVE_FOLDER_ID }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          python scraper_registro_oficial.py || echo "⚠️ Registro Oficial scraper terminó con errores"
+        continue-on-error: true
+
+      - name: "🔗 Vincular Asamblea ↔ Registro Oficial"
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          python linker_asamblea_ro.py || echo "⚠️ Linker terminó con errores"
+        continue-on-error: true
+
+      - name: "🗂️ Ejecutar Scraper — Datos Abiertos (CKAN)"
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          FUENTE="${{ github.event.inputs.fuente || 'all' }}"
+          TEST_FLAG=""
+          if [ "${{ github.event.inputs.modo_test }}" = "true" ]; then
+            TEST_FLAG="--test"
+          fi
+          if [ "$FUENTE" = "all" ] || [ "$FUENTE" = "datos_abiertos" ]; then
+            python collectors/scraper_datos_abiertos.py $TEST_FLAG || echo "⚠️ Datos Abiertos terminó con errores"
+          fi
+        continue-on-error: true
+
+      - name: "📊 Verificar estado en MongoDB"
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          python orquestador.py --status || true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 2: DATOS MENSUALES — BCE + INEC
+  # ──────────────────────────────────────────────────────────────────────────
+  sync-mensual:
+    name: "📈 Sync Mensual (Macroeconómico + Demográfico)"
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '0 4 1 * *') ||
+      (github.event_name == 'workflow_dispatch' && 
+       (github.event.inputs.fuente == 'bce' || github.event.inputs.fuente == 'inec' || 
+        github.event.inputs.fuente == 'all'))
+
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: "📦 Instalar dependencias"
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install openpyxl || true
+
+      - name: "🏦 Ejecutar Scraper — Banco Central del Ecuador (BCE)"
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          TEST_FLAG="${{ github.event.inputs.modo_test == 'true' && '--test' || '' }}"
+          python collectors/scraper_bce.py $TEST_FLAG || echo "⚠️ BCE scraper terminó con errores"
+        continue-on-error: true
+
+      - name: "👥 Ejecutar Scraper — INEC (Empleo + Inflación + Censo)"
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          TEST_FLAG="${{ github.event.inputs.modo_test == 'true' && '--test' || '' }}"
+          python collectors/scraper_inec.py $TEST_FLAG || echo "⚠️ INEC scraper terminó con errores"
+        continue-on-error: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 3: DATOS SEMANALES — CNE (Electoral)
+  # ──────────────────────────────────────────────────────────────────────────
+  sync-electoral:
+    name: "🗳️ Sync Semanal (CNE Electoral)"
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '0 6 * * 1') ||
+      (github.event_name == 'workflow_dispatch' && 
+       (github.event.inputs.fuente == 'cne' || github.event.inputs.fuente == 'all'))
+
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: "📦 Instalar dependencias"
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: "🗳️ Ejecutar Scraper — CNE (Resultados Electorales)"
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          TEST_FLAG="${{ github.event.inputs.modo_test == 'true' && '--test' || '' }}"
+          python collectors/scraper_cne.py $TEST_FLAG || echo "⚠️ CNE scraper terminó con errores"
+        continue-on-error: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 4: NOTIFICACIÓN Y REPORTE (al finalizar todos los jobs)
+  # ──────────────────────────────────────────────────────────────────────────
+  reporte-final:
+    name: "📝 Reporte Final"
+    runs-on: ubuntu-latest
+    needs: [sync-diario, sync-mensual, sync-electoral]
+    if: always()  # Siempre corre, aunque algún job falle
+
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: "📦 Instalar pymongo"
+        run: pip install pymongo
+
+      - name: "📊 Generar reporte de estado"
+        env:
+          MONGO_URI:           ${{ secrets.MONGO_URI }}
+          SYNC_DIARIO:        ${{ needs.sync-diario.result }}
+          SYNC_MENSUAL:       ${{ needs.sync-mensual.result }}
+          SYNC_ELECTORAL:     ${{ needs.sync-electoral.result }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          python orquestador.py --status || true
+          echo ""
+          echo "============================================"
+          echo "RESUMEN DE JOBS:"
+          echo "  Diario    (Legislativo+CKAN): $SYNC_DIARIO"
+          echo "  Mensual   (BCE+INEC):         $SYNC_MENSUAL"
+          echo "  Electoral (CNE):              $SYNC_ELECTORAL"
+          echo "============================================"
+        continue-on-error: true
