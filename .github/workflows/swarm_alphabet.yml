@@ -1,0 +1,34 @@
+name: Alphabet Swarm Autonomous Execution
+
+on:
+  schedule:
+    # Se ejecuta cada 4 horas automáticamente
+    - cron: '0 */4 * * *'
+  workflow_dispatch: # Permite ejecución manual desde github.com
+
+jobs:
+  run-swarm-orchestrator:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          
+      - name: Install AI Dependencies
+        run: pip install anthropic pymongo
+        
+      - name: Inyectar Variables Sensibles de Nube a Nube
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          cd swarm_agents
+          python supervisor.py
+          
+      # El propio supervisor hace su propio Git Push hacia Feature Branches.
+      # Por lo tanto, no es necesario hacer un git commit aquí crudo en bash.

@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       fuente:
-        description: "Fuente a ejecutar (all / datos_abiertos / inec / bce / cne / asamblea / registro / linker)"
+        description: "Fuente a ejecutar (all / datos_abiertos / inec / bce / cne / minfin / contraloria / sri / asamblea / registro / linker)"
         required: false
         default: "all"
       modo_test:
@@ -129,6 +129,7 @@ jobs:
       (github.event_name == 'schedule' && github.event.schedule == '0 4 1 * *') ||
       (github.event_name == 'workflow_dispatch' && 
        (github.event.inputs.fuente == 'bce' || github.event.inputs.fuente == 'inec' || 
+        github.event.inputs.fuente == 'minfin' || github.event.inputs.fuente == 'sri' ||
         github.event.inputs.fuente == 'all'))
 
     steps:
@@ -165,6 +166,24 @@ jobs:
           python collectors/scraper_inec.py $TEST_FLAG || echo "⚠️ INEC scraper terminó con errores"
         continue-on-error: true
 
+      - name: "💰 Ejecutar Scraper — Ministerio de Finanzas (MEF)"
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          TEST_FLAG="${{ github.event.inputs.modo_test == 'true' && '--test' || '' }}"
+          python collectors/scraper_minfin.py $TEST_FLAG || echo "⚠️ MinFin scraper terminó con errores"
+        continue-on-error: true
+
+      - name: "🧾 Ejecutar Scraper — SRI (Recaudación Tributaria)"
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          TEST_FLAG="${{ github.event.inputs.modo_test == 'true' && '--test' || '' }}"
+          python collectors/scraper_sri.py $TEST_FLAG || echo "⚠️ SRI scraper terminó con errores"
+        continue-on-error: true
+
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 3: DATOS SEMANALES — CNE (Electoral)
   # ──────────────────────────────────────────────────────────────────────────
@@ -174,7 +193,8 @@ jobs:
     if: |
       (github.event_name == 'schedule' && github.event.schedule == '0 6 * * 1') ||
       (github.event_name == 'workflow_dispatch' && 
-       (github.event.inputs.fuente == 'cne' || github.event.inputs.fuente == 'all'))
+       (github.event.inputs.fuente == 'cne' || github.event.inputs.fuente == 'contraloria' ||
+        github.event.inputs.fuente == 'all'))
 
     steps:
       - name: "📥 Checkout"
@@ -198,6 +218,15 @@ jobs:
           cd ${{ env.REPO_PATH }}
           TEST_FLAG="${{ github.event.inputs.modo_test == 'true' && '--test' || '' }}"
           python collectors/scraper_cne.py $TEST_FLAG || echo "⚠️ CNE scraper terminó con errores"
+        continue-on-error: true
+
+      - name: "🔍 Ejecutar Scraper — Contraloría General del Estado"
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          cd ${{ env.REPO_PATH }}
+          TEST_FLAG="${{ github.event.inputs.modo_test == 'true' && '--test' || '' }}"
+          python collectors/scraper_contraloria.py $TEST_FLAG || echo "⚠️ Contraloría scraper terminó con errores"
         continue-on-error: true
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -234,8 +263,8 @@ jobs:
           echo ""
           echo "============================================"
           echo "RESUMEN DE JOBS:"
-          echo "  Diario    (Legislativo+CKAN): $SYNC_DIARIO"
-          echo "  Mensual   (BCE+INEC):         $SYNC_MENSUAL"
-          echo "  Electoral (CNE):              $SYNC_ELECTORAL"
+          echo "  Diario    (Legislativo+CKAN):       $SYNC_DIARIO"
+          echo "  Mensual   (BCE+INEC+MEF+SRI):       $SYNC_MENSUAL"
+          echo "  Semanal   (CNE+Contraloría):         $SYNC_ELECTORAL"
           echo "============================================"
         continue-on-error: true

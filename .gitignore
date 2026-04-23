@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Secrets
+.env
+.env.local
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!eslint.config.mjs
+!postcss.config.mjs
+!next.config.ts
+
+# Service accounts & tokens
+service_account.json
+token_personal.json
+credentials.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Logs
+*.log
+corporation_activity.log
+
+# Vercel
+.vercel

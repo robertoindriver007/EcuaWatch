@@ -16,6 +16,9 @@ Fuentes disponibles:
     inec            → ecuadorencifras.gob.ec   (Empleo, IPC, Censo)
     bce             → bce.fin.ec               (PIB, inflación, reservas)
     cne             → resultados.cne.gob.ec    (Resultados electorales)
+    minfin          → finanzas.gob.ec          (Presupuesto, deuda pública)
+    contraloria     → contraloria.gob.ec       (Auditorías, resoluciones)
+    sri             → sri.gob.ec               (Recaudación tributaria)
     asamblea        → asambleanacional.gob.ec  (Proyectos de ley)
     registro        → registroficial.gob.ec    (Leyes publicadas)
     linker          → Vincula Asamblea ↔ RO
@@ -74,12 +77,54 @@ FUENTES = {
         "desc":     "CNE: resultados electorales historicos",
         "prioridad": 4,
     },
+    "minfin": {
+        "modulo":   "collectors.scraper_minfin",
+        "script":   "collectors/scraper_minfin.py",
+        "horario":  "mensual",
+        "desc":     "Min. Finanzas: presupuesto, deuda pública, GADs",
+        "prioridad": 5,
+    },
+    "contraloria": {
+        "modulo":   "collectors.scraper_contraloria",
+        "script":   "collectors/scraper_contraloria.py",
+        "horario":  "semanal",
+        "desc":     "Contraloría: auditorías, resoluciones",
+        "prioridad": 6,
+    },
+    "sri": {
+        "modulo":   "collectors.scraper_sri",
+        "script":   "collectors/scraper_sri.py",
+        "horario":  "mensual",
+        "desc":     "SRI: recaudación tributaria, catastro RUC",
+        "prioridad": 7,
+    },
+    "sercop": {
+        "modulo":   "collectors.scraper_sercop",
+        "script":   "collectors/scraper_sercop.py",
+        "horario":  "semanal",
+        "desc":     "SERCOP: contratación pública (OCDS)",
+        "prioridad": 8,
+    },
+    "judicial": {
+        "modulo":   "collectors.scraper_judicial",
+        "script":   "collectors/scraper_judicial.py",
+        "horario":  "mensual",
+        "desc":     "Función Judicial: causas, sentencias, estadísticas",
+        "prioridad": 9,
+    },
+    "analizador": {
+        "modulo":   None,
+        "script":   "cerebro.py",
+        "horario":  "diario",
+        "desc":     "Cerebro v2: diagnóstico + anomalías + tendencias + críticas",
+        "prioridad": 99,  # Siempre al final (necesita datos de todos los demás)
+    },
     "asamblea": {
         "modulo":   None,
         "script":   "scraper_asamblea.py",   # Script original del repo
         "horario":  "diario",
         "desc":     "Asamblea Nacional: proyectos de ley",
-        "prioridad": 5,
+        "prioridad": 8,
         "externo":  True,
     },
     "registro": {
@@ -87,7 +132,7 @@ FUENTES = {
         "script":   "scraper_registro_oficial.py",
         "horario":  "diario",
         "desc":     "Registro Oficial: leyes publicadas",
-        "prioridad": 6,
+        "prioridad": 9,
         "externo":  True,
     },
     "linker": {
@@ -95,7 +140,7 @@ FUENTES = {
         "script":   "linker_asamblea_ro.py",
         "horario":  "diario",
         "desc":     "Vincula proyectos de ley ↔ Registro Oficial",
-        "prioridad": 7,
+        "prioridad": 10,
         "externo":  True,
     },
 }
