@@ -134,3 +134,63 @@ body {
 /* ── Prose Adjustments ──────────────────────────────────── */
 a { color: var(--color-ecua-blue); text-decoration: none; }
 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── Mobile Safe Area ──────────────────────────────────── */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Scrollbar Hide ────────────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Line Clamp ────────────────────────────────────────── */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Reels: Particle Animation ─────────────────────────── */
+@keyframes float-particle {
+  0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
+  20%  { opacity: 0.6; }
+  80%  { opacity: 0.3; }
+  100% { transform: translateY(-100vh) translateX(20px) scale(0.3); opacity: 0; }
+}
+
+.reel-particle {
+  animation: float-particle 6s ease-in-out infinite;
+}
+
+/* ── Reels: Audio Bars ─────────────────────────────────── */
+@keyframes audio-bar {
+  0%, 100% { height: 4px; }
+  50%      { height: 14px; }
+}
+
+.reel-audio-bar {
+  animation: audio-bar 0.6s ease-in-out infinite;
+}
+
+/* ── Reels: Progress Bar ───────────────────────────────── */
+@keyframes progress-fill {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+.animate-progress {
+  animation: progress-fill 8s linear infinite;
+}
+
+/* ── Map: 3D Perspective ───────────────────────────────── */
+@keyframes map-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+/* ── Responsive: Hide layout elements on Reels page ────── */
+@media (max-width: 768px) {
+  .md\:hidden { display: none !important; }
+}

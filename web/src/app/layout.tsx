@@ -6,6 +6,7 @@ import "./globals.css";
 import TopTicker from "@/components/layout/TopTicker";
 import Navbar from "@/components/layout/Navbar";
 import BottomTicker from "@/components/layout/BottomTicker";
+import MobileNav from "@/components/layout/MobileNav";
 import OutbrainWidget from "@/components/ads/OutbrainWidget";
 
 const geistSans = Geist({
@@ -63,6 +64,9 @@ export default function RootLayout({
 
         {/* Breaking news/alerts bottom ticker */}
         <BottomTicker />
+
+        {/* Mobile bottom navigation */}
+        <MobileNav />
       </body>
     </html>
   );
