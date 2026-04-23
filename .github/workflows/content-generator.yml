@@ -1,0 +1,37 @@
+name: EcuaWatch Content Generator
+
+on:
+  schedule:
+    # Cada 6 horas: 00:00, 06:00, 12:00, 18:00 UTC
+    - cron: '0 0,6,12,18 * * *'
+  workflow_dispatch: # Permite ejecución manual desde GitHub
+
+env:
+  MONGODB_URI: ${{ secrets.MONGODB_URI }}
+  MONGODB_DB: ${{ secrets.MONGODB_DB }}
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+jobs:
+  generate-content:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pymongo[srv] requests dnspython
+
+      - name: Run Content Generator
+        working-directory: agents
+        run: python content_generator.py
+
+      - name: Summary
+        run: echo "✅ Content generation completed at $(date -u)"
