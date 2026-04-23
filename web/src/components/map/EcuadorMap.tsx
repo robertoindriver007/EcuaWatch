@@ -155,7 +155,7 @@ export default function EcuadorMap() {
             {(['alto', 'medio', 'bajo'] as const).map((r, i) => (
               <g key={r} transform={`translate(${i * 55}, 15)`}>
                 <circle cx="5" cy="5" r="4" fill={RISK_COLORS[r]} />
-                <text x="14" y="9" fill="#94a3b8" fontSize="7" fontFamily="Inter" textTransform="uppercase">{r}</text>
+                <text x="14" y="9" fill="#94a3b8" fontSize="7" fontFamily="Inter" style={{ textTransform: 'uppercase' }}>{r}</text>
               </g>
             ))}
           </g>

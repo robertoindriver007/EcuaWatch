@@ -36,9 +36,9 @@ export async function GET(req: NextRequest) {
         break;
     }
 
-    const sortField = tab === 'trending'
-      ? { likes: -1 as const, _id: -1 as const }
-      : { _id: -1 as const };
+    const sortField: Record<string, 1 | -1> = tab === 'trending'
+      ? { likes: -1, _id: -1 }
+      : { _id: -1 };
 
     const items = await col
       .find(query)
