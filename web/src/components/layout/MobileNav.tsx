@@ -1,5 +1,5 @@
 "use client";
-import { Home, Film, Compass, Users, User } from "lucide-react";
+import { Home, Film, Compass, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,7 +8,6 @@ const NAV_ITEMS = [
   { href: '/reels', icon: Film, label: 'Reels' },
   { href: '/explorar', icon: Compass, label: 'Explorar' },
   { href: '/comunidad', icon: Users, label: 'Comunidad' },
-  { href: '#perfil', icon: User, label: 'Perfil' },
 ];
 
 export default function MobileNav() {

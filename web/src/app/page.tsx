@@ -1,8 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import SoftGateModal from "@/components/auth/SoftGateModal";
-import InFeedAd from "@/components/ads/InFeedAd";
 import SwarmPanel from "@/components/SwarmPanel";
 import FeedCard from "@/components/feed/FeedCard";
 import FeedTabs from "@/components/feed/FeedTabs";
@@ -121,8 +119,6 @@ export default function Home() {
 
   return (
     <>
-      <SoftGateModal />
-
       {/* ── HERO: 3D Ecuador Map ──────────────────────────────── */}
       <section className="container mx-auto px-4 pt-4 pb-2 max-w-6xl">
         <EcuadorMap />
@@ -242,10 +238,7 @@ export default function Home() {
 
             {/* Feed items */}
             {!loading && feedItems.map((item, idx) => (
-              <React.Fragment key={item.id}>
-                <FeedCard item={item} index={idx} />
-                {idx === 2 && <InFeedAd adSlot="1234567890" adFormat="fluid" adLayout="in-article" />}
-              </React.Fragment>
+              <FeedCard key={item.id} item={item} index={idx} />
             ))}
 
             {/* Empty state */}
