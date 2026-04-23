@@ -1,17 +1,17 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import SoftGateModal from "@/components/auth/SoftGateModal";
 import InFeedAd from "@/components/ads/InFeedAd";
 import SwarmPanel from "@/components/SwarmPanel";
 import FeedCard from "@/components/feed/FeedCard";
 import FeedTabs from "@/components/feed/FeedTabs";
-import { ORGANIC_FEED, COMMUNITIES, ORGANIC_REELS } from "@/lib/seed-content";
-import type { FeedTab } from "@/lib/types";
+import { COMMUNITIES, ORGANIC_REELS } from "@/lib/seed-content";
+import type { FeedItem, FeedTab } from "@/lib/types";
 import {
   TrendingUp, ChevronRight, Circle, Film, Users,
   Gavel, ShieldAlert, BarChart2, MapPin, Eye,
-  MessageSquare, Zap, Radio
+  MessageSquare, Zap, Radio, Loader2, RefreshCw
 } from "lucide-react";
 
 // Dynamic import for 3D map (heavy component)
@@ -49,13 +49,75 @@ function formatNum(n: number): string {
 
 export default function Home() {
   const [feedTab, setFeedTab] = useState<FeedTab>('paraTi');
+  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Filter feed based on tab
-  const feedItems = feedTab === 'denuncias'
-    ? ORGANIC_FEED.filter(f => f.type === 'citizen')
-    : feedTab === 'trending'
-    ? [...ORGANIC_FEED].sort((a, b) => b.likes - a.likes)
-    : ORGANIC_FEED;
+  // Fetch feed from API
+  const fetchFeed = useCallback(async (tab: FeedTab, cursor?: string) => {
+    try {
+      const params = new URLSearchParams({ tab, limit: '10' });
+      if (cursor) params.set('cursor', cursor);
+
+      const res = await fetch(`/api/feed?${params}`);
+      const data = await res.json();
+
+      return data;
+    } catch (err) {
+      console.error('[Feed] Error:', err);
+      return null;
+    }
+  }, []);
+
+  // Load initial feed or when tab changes
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      const data = await fetchFeed(feedTab);
+      if (!cancelled && data) {
+        setFeedItems(data.items || []);
+        setNextCursor(data.nextCursor);
+        setHasMore(data.hasMore || false);
+      }
+      if (!cancelled) setLoading(false);
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [feedTab, fetchFeed]);
+
+  // Load more (infinite scroll trigger)
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !nextCursor) return;
+    setLoadingMore(true);
+
+    const data = await fetchFeed(feedTab, nextCursor);
+    if (data) {
+      setFeedItems(prev => [...prev, ...(data.items || [])]);
+      setNextCursor(data.nextCursor);
+      setHasMore(data.hasMore || false);
+    }
+    setLoadingMore(false);
+  }, [feedTab, nextCursor, hasMore, loadingMore, fetchFeed]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { rootMargin: '200px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   return (
     <>
@@ -158,18 +220,66 @@ export default function Home() {
             {/* Feed tabs */}
             <FeedTabs active={feedTab} onChange={setFeedTab} />
 
+            {/* Loading skeleton */}
+            {loading && (
+              <div className="space-y-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="glass-card p-5 animate-pulse">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-8 h-8 rounded-full bg-gray-200" />
+                      <div className="flex-1 space-y-1">
+                        <div className="h-3 bg-gray-200 rounded w-1/3" />
+                        <div className="h-2 bg-gray-100 rounded w-1/4" />
+                      </div>
+                    </div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                    <div className="h-3 bg-gray-100 rounded w-full mb-1" />
+                    <div className="h-3 bg-gray-100 rounded w-5/6" />
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Feed items */}
-            {feedItems.map((item, idx) => (
+            {!loading && feedItems.map((item, idx) => (
               <React.Fragment key={item.id}>
                 <FeedCard item={item} index={idx} />
                 {idx === 2 && <InFeedAd adSlot="1234567890" adFormat="fluid" adLayout="in-article" />}
               </React.Fragment>
             ))}
 
-            {/* Load more */}
-            <button className="w-full glass-card p-3 text-center text-[12px] font-semibold text-[#0EA5E9] hover:bg-sky-50 transition-colors">
-              Cargar más publicaciones ↓
-            </button>
+            {/* Empty state */}
+            {!loading && feedItems.length === 0 && (
+              <div className="glass-card p-8 text-center">
+                <MessageSquare size={32} className="text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm">No hay publicaciones en esta categoría</p>
+                <button onClick={() => setFeedTab('paraTi')} className="mt-2 text-[#0EA5E9] text-sm font-semibold hover:underline">
+                  Ver todas →
+                </button>
+              </div>
+            )}
+
+            {/* Infinite scroll sentinel */}
+            <div ref={sentinelRef} className="h-1" />
+
+            {/* Loading more indicator */}
+            {loadingMore && (
+              <div className="flex justify-center py-4">
+                <Loader2 size={20} className="text-[#0EA5E9] animate-spin" />
+              </div>
+            )}
+
+            {/* Manual load more (backup) */}
+            {!loading && hasMore && !loadingMore && (
+              <button onClick={loadMore} className="w-full glass-card p-3 text-center text-[12px] font-semibold text-[#0EA5E9] hover:bg-sky-50 transition-colors flex items-center justify-center gap-2">
+                <RefreshCw size={12} /> Cargar más publicaciones
+              </button>
+            )}
+
+            {/* End of feed */}
+            {!loading && !hasMore && feedItems.length > 0 && (
+              <p className="text-center text-[11px] text-gray-300 py-4">— Has llegado al final —</p>
+            )}
           </div>
 
           {/* ── RIGHT SIDEBAR ────────────────────────── */}

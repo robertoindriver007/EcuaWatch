@@ -1,7 +1,8 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import type { Reel } from "@/lib/types";
 import { ORGANIC_REELS } from "@/lib/seed-content";
-import { Heart, MessageCircle, Share2, Bookmark, Music, Bot, ChevronUp, ChevronDown, Play, Pause } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, Music, Bot, ChevronUp, ChevronDown, Play, Loader2 } from "lucide-react";
 
 function formatNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -10,13 +11,36 @@ function formatNum(n: number): string {
 }
 
 export default function ReelsPage() {
+  const [reels, setReels] = useState<Reel[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [playing, setPlaying] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStart = useRef(0);
-  const reels = ORGANIC_REELS;
+
+  // Fetch reels from API
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/reels?limit=20');
+        const data = await res.json();
+        if (!cancelled && data.reels?.length) {
+          setReels(data.reels);
+        } else if (!cancelled) {
+          setReels(ORGANIC_REELS); // fallback
+        }
+      } catch {
+        if (!cancelled) setReels(ORGANIC_REELS);
+      }
+      if (!cancelled) setLoading(false);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
   const current = reels[currentIdx];
 
   // Touch swipe
@@ -49,6 +73,20 @@ export default function ReelsPage() {
     'Educativo': 'from-emerald-900 via-teal-950 to-slate-950',
     'Investigación': 'from-amber-900 via-orange-950 to-slate-950',
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black z-40 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 size={32} className="text-white animate-spin" />
+          <p className="text-white/50 text-sm">Cargando reels cívicos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!current) return null;
 
   return (
     <div className="fixed inset-0 bg-black z-40 flex items-center justify-center" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>

@@ -1,7 +1,8 @@
 "use client";
-import { COMMUNITIES } from "@/lib/seed-content";
-import { Users, MessageSquare, TrendingUp, ChevronRight, Search } from "lucide-react";
-import { useState } from "react";
+import { COMMUNITIES as SEED_COMMUNITIES } from "@/lib/seed-content";
+import type { Community } from "@/lib/types";
+import { Users, MessageSquare, TrendingUp, ChevronRight, Search, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 
 type Category = 'todas' | 'ciudad' | 'tema' | 'institucion';
 const CATS: { id: Category; label: string }[] = [
@@ -20,8 +21,31 @@ export default function ComunidadPage() {
   const [cat, setCat] = useState<Category>('todas');
   const [search, setSearch] = useState('');
   const [joined, setJoined] = useState<Set<string>>(new Set());
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = COMMUNITIES
+  // Fetch communities from API
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/comunidad?category=${cat === 'todas' ? '' : cat}`);
+        const data = await res.json();
+        if (!cancelled && data.communities?.length) {
+          setCommunities(data.communities);
+        } else if (!cancelled) {
+          setCommunities(SEED_COMMUNITIES);
+        }
+      } catch {
+        if (!cancelled) setCommunities(SEED_COMMUNITIES);
+      }
+      if (!cancelled) setLoading(false);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [cat]);
+
+  const filtered = communities
     .filter(c => cat === 'todas' || c.category === cat)
     .filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.description.toLowerCase().includes(search.toLowerCase()));
 
@@ -35,9 +59,9 @@ export default function ComunidadPage() {
 
           {/* Stats */}
           <div className="flex gap-6 mt-4">
-            <div><span className="font-mono font-bold text-xl">{formatNum(COMMUNITIES.reduce((a, c) => a + c.members, 0))}</span><br /><span className="text-[10px] text-white/60">Ciudadanos activos</span></div>
-            <div><span className="font-mono font-bold text-xl">{COMMUNITIES.length}</span><br /><span className="text-[10px] text-white/60">Comunidades</span></div>
-            <div><span className="font-mono font-bold text-xl">{COMMUNITIES.reduce((a, c) => a + c.postsToday, 0)}</span><br /><span className="text-[10px] text-white/60">Posts hoy</span></div>
+            <div><span className="font-mono font-bold text-xl">{formatNum(communities.reduce((a, c) => a + c.members, 0))}</span><br /><span className="text-[10px] text-white/60">Ciudadanos activos</span></div>
+            <div><span className="font-mono font-bold text-xl">{communities.length}</span><br /><span className="text-[10px] text-white/60">Comunidades</span></div>
+            <div><span className="font-mono font-bold text-xl">{communities.reduce((a, c) => a + c.postsToday, 0)}</span><br /><span className="text-[10px] text-white/60">Posts hoy</span></div>
           </div>
         </div>
       </div>
