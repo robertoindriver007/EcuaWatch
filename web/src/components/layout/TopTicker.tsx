@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { TrendingUp, TrendingDown, X, AlertCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, X, AlertCircle, Loader2 } from 'lucide-react';
 
 type Indicator = {
   id: string;
@@ -13,27 +13,24 @@ type Indicator = {
   traceability: string;
 };
 
-const FALLBACK_INDICATORS: Indicator[] = [
-  { id: '1', title: 'Riesgo País', value: '1,230 pts', trend: 'up', cause: 'Aumento de deuda pública y señales negativas del FMI', effect: 'Encarece préstamos al Estado y sube tasas de crédito', traceability: 'Ley Económica Urgente / Min. Finanzas' },
-  { id: '2', title: 'Inflación Mensual', value: '1.4%', trend: 'up', cause: 'Alza de precios de combustibles y alimentos importados', effect: 'Pérdida de poder adquisitivo en hogares de bajo ingreso', traceability: 'BCE / Política cambiaria Gobierno' },
-  { id: '3', title: 'Ejecución Presupuestaria', value: '38%', trend: 'down', cause: 'Bloqueos burocráticos en SERCOP y falta de liquidez', effect: 'Parálisis de obra pública en municipios de Guayaquil', traceability: 'MEF / Contraloría General del Estado' },
-  { id: '4', title: 'Desempleo Nacional', value: '3.8%', trend: 'down', cause: 'Reducción de plazas en sector formal post-reforma laboral', effect: 'Aumento del trabajo informal y subempleo', traceability: 'Código del Trabajo / Asamblea Nacional' },
-  { id: '5', title: 'Precio Petróleo (WTI)', value: '$76.20', trend: 'up', cause: 'Tensión geopolítica en Oriente Medio + corte de producción OPEP', effect: 'Ingreso fiscal sube levemente, subsidios bajo presión', traceability: 'Ministerio de Energía / EP PetroEcuador' },
-  { id: '6', title: 'Reformas Aprobadas (Mes)', value: '7 leyes', trend: 'up', cause: 'Agenda legislativa acelerada de Gobierno Nacional', effect: 'Cambios en régimen tributario y laboral en vigor', traceability: 'Asamblea Nacional / Registro Oficial' },
-];
-
 export default function TopTicker() {
-  const [indicators, setIndicators] = useState<Indicator[]>(FALLBACK_INDICATORS);
+  const [indicators, setIndicators] = useState<Indicator[]>([]);
+  const [loading, setLoading] = useState(true);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [cardPos, setCardPos] = useState({ x: 0 });
-  const [dimissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch('/api/indicators')
       .then(r => r.json())
-      .then(data => { if (data.success && data.indicators?.length) setIndicators(data.indicators); })
-      .catch(() => { /* use fallback */ });
+      .then(data => {
+        if (data.success && data.indicators?.length) {
+          setIndicators(data.indicators);
+        }
+      })
+      .catch(() => { /* no fallback — if API fails, ticker stays empty */ })
+      .finally(() => setLoading(false));
   }, []);
 
   const handleMouseEnter = (id: string, e: React.MouseEvent) => {
@@ -44,7 +41,31 @@ export default function TopTicker() {
 
   const active = indicators.find(i => i.id === hoveredId);
 
-  if (dimissed) return null;
+  if (dismissed) return null;
+
+  // If no real data loaded, show minimal status bar
+  if (!loading && indicators.length === 0) {
+    return (
+      <div className="relative w-full bg-[#0a0f1c] text-white py-1 border-b border-[#1e3a5f]" style={{ zIndex: 100 }}>
+        <div className="flex items-center justify-center gap-2 text-[10px] text-gray-500">
+          <AlertCircle size={10} />
+          <span>Indicadores en espera — Los agentes IA generarán datos reales próximamente</span>
+          <button onClick={() => setDismissed(true)} className="ml-4 text-gray-600 hover:text-white"><X size={10} /></button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="relative w-full bg-[#0a0f1c] text-white py-1 border-b border-[#1e3a5f]" style={{ zIndex: 100 }}>
+        <div className="flex items-center justify-center gap-2 text-[10px] text-gray-500">
+          <Loader2 size={10} className="animate-spin" />
+          <span>Cargando indicadores desde Gemini IA...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -56,17 +77,14 @@ export default function TopTicker() {
       >
         {/* LIVE badge */}
         <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center px-3 bg-gradient-to-r from-[#0a0f1c] via-[#0a0f1c] to-transparent pr-6">
-          <span className="flex items-center gap-1.5 text-[10px] font-black tracking-widest text-red-500 uppercase">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
-            EN VIVO
+          <span className="flex items-center gap-1.5 text-[10px] font-black tracking-widest text-emerald-500 uppercase">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            GEMINI IA
           </span>
         </div>
 
         {/* Dismiss */}
-        <button
-          onClick={() => setDismissed(true)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-gray-500 hover:text-white transition-colors"
-        >
+        <button onClick={() => setDismissed(true)} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-gray-500 hover:text-white transition-colors">
           <X size={12} />
         </button>
 
@@ -94,7 +112,7 @@ export default function TopTicker() {
         </div>
       </div>
 
-      {/* ── Hover Traceability Card (Glassmorphism) ─────────── */}
+      {/* ── Hover Traceability Card ─────────── */}
       {hoveredId && active && (
         <div
           className="fixed top-9 z-[200] w-80 pointer-events-none"
@@ -110,11 +128,10 @@ export default function TopTicker() {
               WebkitBackdropFilter: 'blur(20px)',
             }}
           >
-            {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <AlertCircle size={13} className="text-sky-400" />
-                <span className="text-sky-400 text-[10px] font-bold uppercase tracking-widest">Análisis Trazable</span>
+                <span className="text-sky-400 text-[10px] font-bold uppercase tracking-widest">Análisis IA</span>
               </div>
               <span className={`text-xs font-bold font-mono ${active.trend === 'up' ? 'text-emerald-400' : 'text-red-400'}`}>
                 {active.value}
@@ -130,7 +147,7 @@ export default function TopTicker() {
             </div>
 
             <div className="mt-3 pt-2 border-t border-white/10">
-              <p className="text-[9px] text-gray-500 text-center">Fuente: Gemini AI + Base de Leyes EcuaWatch</p>
+              <p className="text-[9px] text-gray-500 text-center">Generado por Gemini IA · Datos de MongoDB Atlas</p>
             </div>
           </div>
         </div>
